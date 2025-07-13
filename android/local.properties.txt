@@ -1,0 +1,1 @@
+echo sdk.dir=C:\\Users\\UOS\\AppData\\Local\\Android\\Sdk > android/local.properties
