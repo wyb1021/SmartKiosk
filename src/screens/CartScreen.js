@@ -12,6 +12,26 @@ import {CartContext} from '../context/CartContext';
 const CartScreen = ({navigation}) => {
   const {cartItems, removeFromCart, updateQuantity, clearCart, getTotalPrice} =
     useContext(CartContext);
+
+  // 옵션 값을 한글로 변환하는 헬퍼 함수 추가
+  const getKoreanOption = (optionType, value) => {
+    if (!value) return null; // 값이 없으면 null 반환
+
+    switch (optionType) {
+      case 'size':
+        if (value === 'small') return '작은';
+        if (value === 'medium') return '중간';
+        if (value === 'large') return '큰';
+        return value; // 위에 해당하지 않으면 원래 값 반환 (이미 한국어일 경우 등)
+      case 'temperature':
+        if (value === 'hot') return '뜨거운';
+        if (value === 'iced') return '차가운';
+        return value; // 위에 해당하지 않으면 원래 값 반환 (이미 한국어일 경우 등)
+      default:
+        return value;
+    }
+  };
+
   const removeItem = itemToRemove => {
     Alert.alert('삭제 확인', '이 항목을 장바구니에서 삭제하시겠습니까?', [
       {text: '취소', style: 'cancel'},
@@ -76,62 +96,69 @@ const CartScreen = ({navigation}) => {
     );
   };
 
-  const renderCartItem = ({item}) => (
-    <View style={styles.cartItem}>
-      <View style={styles.itemInfo}>
-        <Text style={styles.itemName}>{item.name}</Text>
-        {item.category !== '디저트' && (
-          <Text style={styles.itemOptions}>
-            {item.options.size && `사이즈: ${item.options.size}`}
-            {item.options.temperature && `, ${item.options.temperature === 'hot' ? '뜨거운' : '차가운'}`}
-          </Text>
-        )}
-        <View style={styles.quantityControls}>
+  const renderCartItem = ({item}) => {
+    // 옵션을 한글로 변환
+    const displaySize = getKoreanOption('size', item.options.size);
+    const displayTemperature = getKoreanOption('temperature', item.options.temperature);
+
+    // 표시할 옵션 문자열 생성
+    let optionsText = '';
+    if (displaySize) {
+      optionsText += `사이즈: ${displaySize}`;
+    }
+    if (displayTemperature) {
+      if (optionsText.length > 0) {
+        optionsText += `, `; // 이미 사이즈가 있으면 콤마 추가
+      }
+      optionsText += displayTemperature;
+    }
+
+    return (
+      <View style={styles.cartItem}>
+        <View style={styles.itemInfo}>
+          <Text style={styles.itemName}>{item.name}</Text>
+          {item.category !== '디저트' && optionsText.length > 0 && (
+            <Text style={styles.itemOptions}>{optionsText}</Text>
+          )}
+          <View style={styles.quantityControls}>
+            <TouchableOpacity
+              style={styles.quantityButton}
+              onPress={() => handleQuantityChange(item, item.quantity - 1)}>
+              <Text style={styles.quantityButtonText}>-</Text>
+            </TouchableOpacity>
+            <Text style={styles.itemQuantity}>{item.quantity}개</Text>
+            <TouchableOpacity
+              style={styles.quantityButton}
+              onPress={() => handleQuantityChange(item, item.quantity + 1)}>
+              <Text style={styles.quantityButtonText}>+</Text>
+            </TouchableOpacity>
+          </View>
           <TouchableOpacity
-            style={styles.quantityButton}
-            onPress={() => handleQuantityChange(item, item.quantity - 1)}>
-            <Text style={styles.quantityButtonText}>-</Text>
-          </TouchableOpacity>
-          <Text style={styles.itemQuantity}>{item.quantity}개</Text>
-          <TouchableOpacity
-            style={styles.quantityButton}
-            onPress={() => handleQuantityChange(item, item.quantity + 1)}>
-            <Text style={styles.quantityButtonText}>+</Text>
+            onPress={() => {
+              navigation.navigate('MenuDetail', {
+                fromCart: true,
+                initialOptions: item.options, // 이 값은 여전히 원래 저장된 값을 넘겨줌 (영어 또는 한글)
+                initialQuantity: item.quantity,
+                item: item.menu,
+              });
+            }}
+            style={styles.changeButton}>
+            <Text style={styles.changeButtonText}>옵션 변경</Text>
           </TouchableOpacity>
         </View>
-        <TouchableOpacity
-          onPress={() => {
-            // 메뉴명에서 (iced) 또는 (hot) 제거하여 기본 이름 추출
-            const baseName = item.name.replace(/\s*\((iced|hot)\)\s*/i, '').trim();
-            
-            navigation.navigate('MenuDetail', {
-              fromCart: true,
-              initialOptions: item.options,
-              initialQuantity: item.quantity,
-              item: {
-                 ...item.menu,        
-                 options: item.options,
-                 quantity: item.quantity,
-              }
-            })
-          }}
-          style={styles.changeButton}
-        >
-         <Text style={styles.changeButtonText}>옵션 변경</Text>
-       </TouchableOpacity>
+        <View style={styles.itemPriceSection}>
+          <Text style={styles.itemPrice}>
+            {item.totalPrice.toLocaleString()}원
+          </Text>
+          <TouchableOpacity
+            style={styles.removeButton}
+            onPress={() => removeItem(item)}>
+            <Text style={styles.removeButtonText}>삭제</Text>
+          </TouchableOpacity>
+        </View>
       </View>
-      <View style={styles.itemPriceSection}>
-        <Text style={styles.itemPrice}>
-          {item.totalPrice.toLocaleString()}원
-        </Text>
-        <TouchableOpacity
-          style={styles.removeButton}
-          onPress={() => removeItem(item)}>
-          <Text style={styles.removeButtonText}>삭제</Text>
-        </TouchableOpacity>
-      </View>
-  </View>
-  );
+    );
+  };
 
   return (
     <View style={styles.container}>

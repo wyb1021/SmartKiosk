@@ -15,6 +15,8 @@ import { useNavigation } from '@react-navigation/native';
 
 import { useMenu } from '../contexts/MenuContext';
 import { CartContext } from '../context/CartContext';
+// voiceCommand.js 파일 임포트
+import { handleVoiceCommand } from '../services/voiceCommand'; // 만약 voiceCommandProcessor.js라면 해당 파일명으로 변경
 
 const { width: screenWidth } = Dimensions.get('window');
 
@@ -61,8 +63,8 @@ const QUICK_MENUS = [
 export default function MenuListScreen() {
   const nav = useNavigation();
   const { menus } = useMenu();
-  const { addToCart, clearCart } = useContext(CartContext);
-  
+  const { cartItems, addToCart, updateItemOptions, removeItem, clearCart } = useContext(CartContext); // cartItems 추가
+
   // Quick 메뉴 수량 상태 - 기본값 1로 초기화
   const [quickQuantities, setQuickQuantities] = useState(
     QUICK_MENUS.reduce((acc, menu) => {
@@ -98,11 +100,11 @@ export default function MenuListScreen() {
   }, [menus]);
 
   const sorted = useMemo(() => {
-    const rank = m => (m.adminPriority ?? Infinity);      // null ⇒ 맨 뒤
+    const rank = m => (m.adminPriority ?? Infinity);    // null ⇒ 맨 뒤
     return [...mergedMenus].sort((a, b) => {
-      const r = rank(a) - rank(b);                        // ① adminPriority
+      const r = rank(a) - rank(b);                     // ① adminPriority
       if (r !== 0) return r;
-      if (a.popularity !== b.popularity)                 // ② popularity (높을수록 위)
+      if (a.popularity !== b.popularity)               // ② popularity (높을수록 위)
         return b.popularity - a.popularity;
       return a.name.localeCompare(b.name, 'ko');
     });
@@ -129,9 +131,9 @@ export default function MenuListScreen() {
   const CAT_ORDER = ['Quick', '전체', '커피', '티', '라떼', '에이드', '스무디', '디저트'];
   const cats = useMemo(
     () =>
-      CAT_ORDER.filter(k => 
-        k === '전체' || 
-        k === 'Quick' || 
+      CAT_ORDER.filter(k =>
+        k === '전체' ||
+        k === 'Quick' ||
         mergedMenus.some(m => m.category === k)
       ),
     [mergedMenus],
@@ -142,7 +144,7 @@ export default function MenuListScreen() {
     catRef.current?.scrollToIndex({ index: i, viewPosition: 0.5 });
   };
 
-  const filteredMenus = 
+  const filteredMenus =
     cat === '전체' ? sorted :
     cat === 'Quick' ? quickMenusWithImages :
     sorted.filter(m => m.category === cat);
@@ -156,7 +158,7 @@ export default function MenuListScreen() {
         isQuick: true
       }));
     }
-    
+
     // 일반 메뉴는 두 개씩
     const rows = [];
     for (let i = 0; i < filteredMenus.length; i += 2) {
@@ -172,7 +174,7 @@ export default function MenuListScreen() {
 
   /* ───────── Quick 메뉴 핸들러 ───────── */
   const getQuantity = (itemId) => quickQuantities[itemId] || 1;
-  
+
   const updateQuantity = (itemId, delta) => {
     setQuickQuantities(prev => ({
       ...prev,
@@ -208,7 +210,7 @@ export default function MenuListScreen() {
               ...prev,
               [item.id]: 1
             }));
-            
+
             // 바로 결제 진행
             Alert.alert(
               '결제 확인',
@@ -259,7 +261,7 @@ export default function MenuListScreen() {
             }));
             Alert.alert(
             '장바구니 담기',
-             `${item.quickLabel} ${quantity}개가 담겼습니다.`
+              `${item.quickLabel} ${quantity}개가 담겼습니다.`
             )
           }
         },
@@ -272,6 +274,29 @@ export default function MenuListScreen() {
         }
       ],
       { cancelable: false }
+    );
+  };
+
+  /* ───────── 음성 명령 처리 함수 ───────── */
+  const onVoiceCommand = async () => {
+    // 실제 음성 입력은 Speech-to-Text 라이브러리를 통해 받아와야 합니다.
+    // 여기서는 임시로 Alert 프롬프트를 사용하여 음성 입력을 받습니다.
+    Alert.prompt(
+      '음성 명령 입력',
+      '음성으로 명령해주세요 (예: "아메리카노 한 잔 담아줘")',
+      async (voiceInput) => {
+        if (voiceInput) {
+          await handleVoiceCommand(
+            voiceInput,
+            cartItems, // 현재 장바구니 항목 전달
+            menus,     // 전체 메뉴 데이터 전달
+            { addToCart, updateItemOptions, removeItem, clearCart } // CartContext 함수들 전달
+          );
+        } else {
+          Alert.alert("음성 입력 없음", "명령이 취소되었습니다.");
+        }
+      },
+      'plain-text'
     );
   };
 
@@ -290,17 +315,17 @@ export default function MenuListScreen() {
 
   const renderQuickCard = (item) => {
     const quantity = getQuantity(item.id);
-    
+
     return (
       <View style={ss.quickCard}>
-        <TouchableOpacity 
+        <TouchableOpacity
           style={ss.quickInfo}
-          onPress={() => nav.navigate('MenuDetail', { 
+          onPress={() => nav.navigate('MenuDetail', {
             item: {
               ...item,
               _id: item._id || item.id
             },
-            initialOptions: item.options 
+            initialOptions: item.options
           })}
         >
           <Image
@@ -318,7 +343,7 @@ export default function MenuListScreen() {
             <Text style={ss.quickPrice}>{item.price.toLocaleString()}원</Text>
           </View>
         </TouchableOpacity>
-        
+
         <View style={ss.quickControls}>
           <View style={ss.quantityControls}>
             <TouchableOpacity
@@ -351,7 +376,7 @@ export default function MenuListScreen() {
 
     const imgs = item.images?.length ? item.images : [item.imageUrl];
     const icedOnly = item.temperatureOptions?.length === 1
-                  && item.temperatureOptions[0] === 'iced';
+                     && item.temperatureOptions[0] === 'iced';
 
     return (
       <TouchableOpacity
@@ -391,7 +416,10 @@ export default function MenuListScreen() {
             <Icon name="arrow-back" size={26} />
           </TouchableOpacity>
           <Text style={ss.title}>메뉴</Text>
-          <View style={{ width: 26 }} />
+          {/* 음성 명령 버튼 추가 */}
+          <TouchableOpacity onPress={onVoiceCommand}>
+            <Icon name="mic" size={26} color="#007AFF" />
+          </TouchableOpacity>
         </View>
 
         {/* ─ Control row ─ */}
@@ -644,6 +672,7 @@ const ss = StyleSheet.create({
     marginHorizontal: 15,
     minWidth: 20,
     textAlign: 'center',
+    color: '#000',
   },
   addButton: {
     backgroundColor: '#007AFF',
