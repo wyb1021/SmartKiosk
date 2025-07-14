@@ -11,6 +11,7 @@ const menuSchema = new mongoose.Schema(
     temperatureOptions:[String],    // ['hot','iced']
     adminPriority: { type: Number, default: null }, // null = 미설정
     popularity:    { type: Number, default: 0     }, // 주문건수
+    tags: { type: [String], default: [] },
   },
   { timestamps: true }
 );

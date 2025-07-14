@@ -9,6 +9,7 @@ import Tts from 'react-native-tts';
 import { useNavigation } from '@react-navigation/native';
 import { processVoiceCommand } from '../services/openaiService';   // LLM 호출
 import { useMenu } from './MenuContext';                          // ★ 새 컨텍스트
+import { useCart } from '../context/CartContext';
 
 export const VoiceContext = createContext();
 
@@ -23,6 +24,8 @@ export const VoiceProvider = ({ children }) => {
   /* ---------- 훅스 ---------- */
   const navigation = useNavigation();
   const { findMenuItem } = useMenu();               // ★ DB 메뉴 검색 함수
+  const { cartItems }    = useCart();
+  const { menus }        = useMenu();
 
   /* ---------- 초기화 ---------- */
   useEffect(() => {
@@ -64,7 +67,7 @@ export const VoiceProvider = ({ children }) => {
   const onSpeechResults = event => {
     const text = event.value[0];
     setRecognizedText(text);
-    processCommand(text);                      // 비동기 LLM 호출
+    processCommand(text, cartItems, menus);                      // 비동기 LLM 호출
 
     // 5초 후 텍스트 초기화
     clearTimeout(recognizedTextTimer);
@@ -103,11 +106,11 @@ export const VoiceProvider = ({ children }) => {
   };
 
   /* ---------- LLM + 메뉴 매핑 ---------- */
-  const processCommand = async userText => {
+  const processCommand = async (userText, cartItems, menus)  => {
     try {
       Tts.speak('잠시만 기다려 주세요.');
 
-      const result = await processVoiceCommand(userText);   // LLM 호출
+      const result = await processVoiceCommand(userText, cartItems, menus);   // LLM 호출
 
       if (result?.response) Tts.speak(result.response);
 

@@ -8,31 +8,46 @@ const openai = new OpenAI({
   baseURL: 'https://api.openai.com/v1', 
 });
 
-export const processVoiceCommand = async (voiceInput) => {
-  const messages = [
-    {
-      role: 'system',
-      content: `당신은 카페 키오스크 AI 어시스턴트입니다.
-사용자의 음성 주문을 분석하여 다음 JSON 형식으로 변환해주세요:
-
-{
-  "action": "주문/수정/취소/조회",
-  "items": [
-    {
-      "menu": "메뉴명",
-      "temperature": "hot/iced",
-      "size": "small/medium/large",  
-      "quantity": 수량
-    }
-  ],
-  "response": "사용자에게 할 음성 응답, 응답은 친절하고 간결하게"
-}`,
-    },
-    {
-      role: 'user',
-      content: voiceInput,
-    },
-  ];
+export const processVoiceCommand = async (voiceInput, cartItems, menus) => {
+   const cartText = cartItems.length
+     ? cartItems.map((c,i) => `${i+1}. ${c.menu} (${c.size}/${c.temperature}) x ${c.quantity}`).join('\n')
+     : '장바구니에 담긴 항목이 없습니다.';
+ 
+   // 2) menus → 텍스트로 변환
+   const menuText = menus.map(m =>
+     `- ${m.name} [카테고리: ${m.category}, 가격: ${m.price}원]`
+   ).join('\n');
+ 
+   // 3) system prompt 작성 (장바구니 + 메뉴 DB 포함)
+   const systemPrompt = `
+ 당신은 카페 키오스크 AI 어시스턴트입니다.
+ 아래는 현재 장바구니 정보입니다:
+ ${cartText}
+ 
+ 아래는 메뉴 데이터베이스 전체 목록입니다:
+ ${menuText}
+ 
+ 사용자의 음성 주문을 분석하여, 장바구니를 갱신하거나 조회·취소·수정하는 작업을 JSON으로 반환해주세요.
+ 응답 형식(JSON)은 다음과 같습니다:
+ 
+ {
+   "action": "주문/수정/취소/조회",
+   "items": [
+     {
+       "menu": "메뉴명",
+       "temperature": "hot/iced",
+       "size": "small/medium/large",
+       "quantity": 수량
+     }
+   ],
+   "response": "사용자에게 할 음성 응답"
+ }
+   `.trim();
+ 
+   const messages = [
+     { role: 'system', content: systemPrompt },
+     { role: 'user',   content: voiceInput },
+   ];
 
   try {
     const completion = await openai.chat.completions.create({
