@@ -1,16 +1,11 @@
-import React, {
-  createContext,
-  useState,
-  useEffect,
-  useContext,
-} from 'react';
+import React, { createContext, useState, useEffect, useContext } from 'react';
 import Voice from '@react-native-community/voice';
 import Tts from 'react-native-tts';
 import { useNavigation } from '@react-navigation/native';
-import { processVoiceCommand } from '../services/openaiService';   // LLM 호출
-import { useMenu } from './MenuContext';                          // ★ 새 컨텍스트
-import { useCart } from '../context/CartContext';
 import { PermissionsAndroid, Platform } from 'react-native';
+import { processVoiceCommand } from '../services/openaiService';
+import { useMenu } from '../contexts/MenuContext';
+import { useCart } from '../context/CartContext';
 
 export const VoiceContext = createContext();
 
@@ -31,141 +26,53 @@ async function requestAudioPermission() {
 }
 
 export const VoiceProvider = ({ children }) => {
-  /* ---------- 상태 ---------- */
   const [isListening, setIsListening] = useState(false);
   const [recognizedText, setRecognizedText] = useState('');
   const [error, setError] = useState('');
   const [silenceTimer, setSilenceTimer] = useState(null);
   const [recognizedTextTimer, setRecognizedTextTimer] = useState(null);
 
-  /* ---------- 훅스 ---------- */
   const navigation = useNavigation();
-  const { findMenuItem } = useMenu();               // ★ DB 메뉴 검색 함수
-  const { cartItems }    = useCart();
-  const { menus }        = useMenu();
+  const { findMenuItem, menus } = useMenu();
+  const { cartItems } = useCart();
 
-  /* ---------- 초기화 ---------- */
-  useEffect(() => {
-    // TTS 기본값
-    Tts.setDefaultLanguage('ko-KR');
-    Tts.setDefaultRate(0.5);
-
-    // Voice 이벤트 리스너
-    Voice.onSpeechStart = onSpeechStart;
-    Voice.onSpeechEnd = onSpeechEnd;
-    Voice.onSpeechError = onSpeechError;
-    Voice.onSpeechResults = onSpeechResults;
-    Voice.onSpeechPartialResults = onSpeechPartialResults;
-
-    return () => {
-      Voice.destroy().then(Voice.removeAllListeners);
-    };
-  }, []);
-
-  /* ---------- Voice 이벤트 ---------- */
-  const onSpeechStart = () => {
-    setError('');
-    setRecognizedText('');
-    console.log('음성 인식 시작');
+  // 사용자가 텍스트로 직접 명령을 보낼 때 호출
+  const simulateTextCommand = async (text) => {
+    await processCommand(text);
   };
 
-  const onSpeechEnd = () => {
-    console.log('음성 인식 종료');
-    setIsListening(false);
-  };
-
-  const onSpeechError = e => {
-    console.log('음성 인식 오류:', e);
-    setError(e.error);
-    setIsListening(false);
-    Tts.speak('음성 인식에 실패했습니다. 다시 시도해주세요.');
-  };
-
-  const onSpeechResults = event => {
-    const text = event.value[0];
-    setRecognizedText(text);
-    processCommand(text, cartItems, menus);                      // 비동기 LLM 호출
-
-    // 5초 후 텍스트 초기화
-    clearTimeout(recognizedTextTimer);
-    setRecognizedTextTimer(setTimeout(() => setRecognizedText(''), 5000));
-  };
-
-  const onSpeechPartialResults = event => {
-    setRecognizedText(event.value[0]);
-
-    clearTimeout(silenceTimer);
-    setSilenceTimer(
-      setTimeout(() => isListening && stopListening(), 2000),
-    );
-  };
-
-  /* ---------- 음성 시작/종료 ---------- */
-  const startListening = async () => {
-    try {
-      const ok = await requestAudioPermission();
-      if (!ok) {
-        Tts.speak('마이크 권한이 거부되었습니다.');
-        return;
-      }
-      setIsListening(true);
-      await Voice.start('ko-KR');
-    } catch (e) {
-      console.error('음성 시작 실패', e);
-      setIsListening(false);
-    }
-  };
-
-  const stopListening = async () => {
-    try {
-      clearTimeout(silenceTimer);
-      setSilenceTimer(null);
-      await Voice.stop();
-      setIsListening(false);
-    } catch (e) {
-      console.error(e);
-    }
-  };
-
-  /* ---------- LLM + 메뉴 매핑 ---------- */
-  const processCommand = async (userText, cartItems, menus)  => {
+  // 실제 음성 또는 텍스트 명령어 공통 처리
+  const processCommand = async (userText) => {
     try {
       Tts.speak('잠시만 기다려 주세요.');
-
-      const result = await processVoiceCommand(userText, cartItems, menus);   // LLM 호출
+      const result = await processVoiceCommand(userText, cartItems, menus);
 
       if (result?.response) Tts.speak(result.response);
 
-      // LLM이 반환한 메뉴명을 DB 객체로 매핑
-      const firstItem = result.items?.[0];
-      const menuObj =
-        firstItem && findMenuItem(firstItem.menu.toLowerCase());
+      const first = result.items?.[0];
+      const menuObj = first && findMenuItem(first.menu.toLowerCase());
 
       if (result.action === '추천') {
-        const recObjs = result.items
+        const recs = result.items
           .map(i => menus.find(m => m.name === i.menu))
           .filter(Boolean);
-        navigation.navigate('RecommendationList', { items: recObjs });
-      if (result.response) Tts.speak(result.response);
-      return;
+        return navigation.navigate('RecommendationList', { items: recs });
       }
+
       switch (result.action) {
         case '주문':
-          if (menuObj) {
-            navigation.navigate('MenuDetail', { item: menuObj });
-          } else {
-            Tts.speak('해당 메뉴를 찾지 못했습니다.');
-          }
+          if (menuObj) navigation.navigate('MenuDetail', { item: menuObj });
+          else Tts.speak('해당 메뉴를 찾지 못했습니다.');
           break;
         case '장바구니':
         case '조회':
           navigation.navigate('Cart');
           break;
         case '취소':
-          // TODO: 취소 로직
+          // TODO
           break;
         default:
-          Tts.speak('죄송합니다. 아직 지원하지 않는 요청입니다.');
+          Tts.speak('죄송합니다. 지원하지 않는 요청입니다.');
       }
     } catch (e) {
       console.error('[processCommand] LLM 오류:', e);
@@ -173,7 +80,48 @@ export const VoiceProvider = ({ children }) => {
     }
   };
 
-  /* ---------- 컨텍스트 제공 ---------- */
+  // STT 이벤트 핸들러들은 processCommand 호출만 다릅니다.
+  const onSpeechStart = () => { setError(''); setRecognizedText(''); };
+  const onSpeechEnd   = () => setIsListening(false);
+  const onSpeechError = e => { setError(e.error); setIsListening(false); Tts.speak('음성 인식 실패'); };
+  const onSpeechResults = e => {
+    const txt = e.value[0];
+    setRecognizedText(txt);
+    processCommand(txt);
+    clearTimeout(recognizedTextTimer);
+    setRecognizedTextTimer(setTimeout(() => setRecognizedText(''), 5000));
+  };
+  const onSpeechPartialResults = e => {
+    setRecognizedText(e.value[0]);
+    clearTimeout(silenceTimer);
+    setSilenceTimer(setTimeout(() => isListening && stopListening(), 2000));
+  };
+
+  const startListening = async () => {
+    if (!(await requestAudioPermission())) {
+      return Tts.speak('마이크 권한이 거부되었습니다.');
+    }
+    setIsListening(true);
+    await Voice.start('ko-KR');
+  };
+  const stopListening = async () => {
+    clearTimeout(silenceTimer);
+    setSilenceTimer(null);
+    await Voice.stop();
+    setIsListening(false);
+  };
+
+  useEffect(() => {
+    Tts.setDefaultLanguage('ko-KR');
+    Tts.setDefaultRate(0.5);
+    Voice.onSpeechStart = onSpeechStart;
+    Voice.onSpeechEnd = onSpeechEnd;
+    Voice.onSpeechError = onSpeechError;
+    Voice.onSpeechResults = onSpeechResults;
+    Voice.onSpeechPartialResults = onSpeechPartialResults;
+    return () => Voice.destroy().then(Voice.removeAllListeners);
+  }, []);
+
   return (
     <VoiceContext.Provider
       value={{
@@ -182,7 +130,9 @@ export const VoiceProvider = ({ children }) => {
         error,
         startListening,
         stopListening,
-      }}>
+        simulateTextCommand,  // ← 텍스트 시뮬레이션용
+      }}
+    >
       {children}
     </VoiceContext.Provider>
   );

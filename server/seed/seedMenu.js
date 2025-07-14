@@ -39,7 +39,7 @@ await Menu.insertMany([
   {
     name: '카페 라떼 (Iced)',
     category: '커피',
-    price: 4500,
+    price: 4200,
     imageUrl: img('caffelatteice.jpg'),
     temperatureOptions: ['iced'],
     sizeOptions: ['small', 'medium', 'large'],
@@ -61,7 +61,7 @@ await Menu.insertMany([
   {
     name: '카페 모카 (Iced)',
     category: '커피',
-    price: 5000,
+    price: 4700,
     imageUrl: img('caffemochaice.jpg'),
     temperatureOptions: ['iced'],
     sizeOptions: ['small', 'medium', 'large'],
@@ -94,7 +94,7 @@ await Menu.insertMany([
   {
     name: '카라멜 마키아토 (Hot)',
     category: '커피',
-    price: 4800,
+    price: 5100,
     imageUrl: img('caramelmacchiatohot.jpg'),
     temperatureOptions: ['hot'],
     sizeOptions: ['small', 'medium', 'large'],
@@ -217,7 +217,7 @@ await Menu.insertMany([
   {
     name: '페퍼민트 티 (Iced)',
     category: '티',
-    price: 3900,
+    price: 3700,
     imageUrl: img('peppermintteaice.jpg'),
     temperatureOptions: ['iced'],
     sizeOptions: ['small', 'medium', 'large'],
@@ -251,7 +251,7 @@ await Menu.insertMany([
   {
     name: '말차 라떼 (Hot)',
     category: '라떼',
-    price: 4600,
+    price: 4900,
     imageUrl: img('matchalattehot.jpg'),
     temperatureOptions: ['hot'],
     sizeOptions: ['small', 'medium', 'large'],
@@ -262,7 +262,7 @@ await Menu.insertMany([
   {
     name: '코코아 (Iced)',
     category: '라떼', // 새로운 카테고리 추가
-    price: 4300,
+    price: 4000,
     imageUrl: img('cocoaice.jpg'),
     temperatureOptions: ['iced'],
     sizeOptions: ['small', 'medium', 'large'],

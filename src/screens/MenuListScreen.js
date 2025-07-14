@@ -47,6 +47,15 @@ const QUICK_MENUS = [
     options: { size: '중간', temperature: 'iced' },
     quickLabel: '레몬 에이드'
   },
+  {
+    id: 'quick-saltbread',
+    baseName: '소금빵',
+    name: '소금빵',
+    category: '디저트',
+    price: 2900,
+    options: {},
+    quickLabel: '소금빵'
+  },
 ];
 
 export default function MenuListScreen() {
@@ -117,7 +126,7 @@ export default function MenuListScreen() {
 
   /* ───────── 카테고리 상태 ───────── */
   const [cat, setCat] = useState('Quick');
-  const CAT_ORDER = ['전체', 'Quick', '커피', '티', '라떼', '에이드', '스무디', '디저트'];
+  const CAT_ORDER = ['Quick', '전체', '커피', '티', '라떼', '에이드', '스무디', '디저트'];
   const cats = useMemo(
     () =>
       CAT_ORDER.filter(k => 
@@ -248,8 +257,10 @@ export default function MenuListScreen() {
               ...prev,
               [item.id]: 1
             }));
-            
-            // 현재 화면에 머물기 (이동하지 않음)
+            Alert.alert(
+            '장바구니 담기',
+             `${item.quickLabel} ${quantity}개가 담겼습니다.`
+            )
           }
         },
         {
@@ -299,9 +310,11 @@ export default function MenuListScreen() {
           />
           <View style={ss.quickDetails}>
             <Text style={ss.quickName}>{item.quickLabel}</Text>
-            <Text style={ss.quickOptions}>
-              {item.options.size}, {item.options.temperature === 'hot' ? '뜨거운' : '차가운'}
-            </Text>
+              {item.category !== '디저트' && item.options.size && item.options.temperature && (
+                <Text style={ss.quickOptions}>
+                 {item.options.size}, {item.options.temperature === 'hot' ? '뜨거운' : '차가운'}
+                </Text>
+              )}
             <Text style={ss.quickPrice}>{item.price.toLocaleString()}원</Text>
           </View>
         </TouchableOpacity>

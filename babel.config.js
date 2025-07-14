@@ -1,11 +1,13 @@
 module.exports = {
   presets: ['module:metro-react-native-babel-preset'],
   plugins: [
-    ['module:react-native-dotenv', {          // ★ 추가
+    ['module:react-native-dotenv', {
       moduleName: '@env',
-      path: '.env',                           // 기본값이라면 생략 가능
+      path: '.env',
+      blacklist: null,
+      whitelist: null,
       safe: false,
-      allowUndefined: false,
+      allowUndefined: true,
     }],
   ],
 };

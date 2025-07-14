@@ -2,12 +2,13 @@ import React from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
-import { MenuProvider } from './src/contexts/MenuContext';    // ★ 추가
+import { MenuProvider } from './src/contexts/MenuContext';
 import { CartProvider } from './src/context/CartContext';
 import { VoiceProvider } from './src/contexts/VoiceContext';
 
 import AppNavigator from './src/navigation/AppNavigator';
 import GlobalVoiceButton from './src/components/GlobalVoiceButton';
+import GlobalTextInputWrapper from './src/components/GlobalTextInputWrapper';
 
 export default function App() {
   return (
@@ -18,6 +19,7 @@ export default function App() {
             <VoiceProvider>
               <AppNavigator />
               <GlobalVoiceButton />
+              <GlobalTextInputWrapper />
             </VoiceProvider>
           </NavigationContainer>
         </CartProvider>
@@ -25,4 +27,3 @@ export default function App() {
     </SafeAreaProvider>
   );
 }
-
