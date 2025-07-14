@@ -119,6 +119,14 @@ export const VoiceProvider = ({ children }) => {
       const menuObj =
         firstItem && findMenuItem(firstItem.menu.toLowerCase());
 
+      if (result.action === '추천') {
+        const recObjs = result.items
+          .map(i => menus.find(m => m.name === i.menu))
+          .filter(Boolean);
+        navigation.navigate('RecommendationList', { items: recObjs });
+      if (result.response) Tts.speak(result.response);
+      return;
+      }
       switch (result.action) {
         case '주문':
           if (menuObj) {

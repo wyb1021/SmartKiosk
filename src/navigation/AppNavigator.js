@@ -4,6 +4,7 @@ import HomeScreen from '../screens/HomeScreen';
 import MenuListScreen from '../screens/MenuListScreen';
 import MenuDetailScreen from '../screens/MenuDetailScreen';
 import CartScreen from '../screens/CartScreen';
+import RecommendationListScreen from '../screens/RecommendationListScreen'
 
 const Stack = createStackNavigator();
 
@@ -29,6 +30,10 @@ export default function AppNavigator() {
         name="Cart" 
         component={CartScreen} 
         options={{ title: '장바구니' }} 
+      />
+      <Stack.Screen
+        name="RecommendationList"
+        component={RecommendationListScreen}
       />
     </Stack.Navigator>
   );

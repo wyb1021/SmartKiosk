@@ -13,14 +13,12 @@ import Icon from 'react-native-vector-icons/MaterialIcons';
 import { useNavigation } from '@react-navigation/native';
 
 import { useMenu } from '../contexts/MenuContext';
-import { useVoice } from '../contexts/VoiceContext';
 
 const { width: screenWidth } = Dimensions.get('window');
 
 export default function MenuListScreen() {
   const nav = useNavigation();
   const { menus } = useMenu();
-  const { isListening, startListening, stopListening } = useVoice();
   /* ───────── 1) Hot / Iced 항목 병합 ───────── */
   const mergedMenus = useMemo(() => {
     const dict = {};
@@ -153,13 +151,6 @@ export default function MenuListScreen() {
         <View style={ss.ctrl}>
           <TouchableOpacity style={ss.cart} onPress={() => nav.navigate('Cart')}>
             <Text style={ss.cartTxt}>장바구니</Text>
-          </TouchableOpacity>
-          <View style={{ flex: 1 }} />
-          <TouchableOpacity
-            style={[ss.mic, isListening && ss.micRec]}
-            onPress={isListening ? stopListening : startListening}
-          >
-            <Icon name={isListening ? 'mic' : 'mic-none'} size={22} color="#fff" />
           </TouchableOpacity>
         </View>
 

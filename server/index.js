@@ -12,7 +12,6 @@ app.use(express.json());
 app.use('/menus', menuRoutes);
 app.use('/images', express.static('public/images'));
 app.use('/api/menu', menuRoutes);
-
 mongoose
   .connect(process.env.MONGO_URI)
   .then(() => {

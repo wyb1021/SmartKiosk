@@ -14,9 +14,9 @@ export const processVoiceCommand = async (voiceInput, cartItems, menus) => {
      : '장바구니에 담긴 항목이 없습니다.';
  
    // 2) menus → 텍스트로 변환
-   const menuText = menus.map(m =>
-     `- ${m.name} [카테고리: ${m.category}, 가격: ${m.price}원]`
-   ).join('\n');
+  const menuText = menus.map(m =>
+    `- ${m.name} [카테고리: ${m.category}, 가격: ${m.price}원, 태그: ${m.tags.join(',')}]`
+  ).join('\n');
  
    // 3) system prompt 작성 (장바구니 + 메뉴 DB 포함)
    const systemPrompt = `
@@ -42,6 +42,9 @@ export const processVoiceCommand = async (voiceInput, cartItems, menus) => {
    ],
    "response": "사용자에게 할 음성 응답"
  }
+사용자가 “어르신을 위한 메뉴를 추천해줘” 와 같은 요청을 하면,
+tags 배열에 따라 알맞은 메뉴를 선택해 JSON으로 내려주세요.
+tags 중 하나인 어르신과 비슷한 나이 많은 사람, 노인 등 유사한 정보가 담기면 해당 tags에 알맞는 메뉴를 JSON으로 내려주세요.
    `.trim();
  
    const messages = [
