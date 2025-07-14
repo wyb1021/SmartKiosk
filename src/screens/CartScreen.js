@@ -12,7 +12,6 @@ import {CartContext} from '../context/CartContext';
 const CartScreen = ({navigation}) => {
   const {cartItems, removeFromCart, updateQuantity, clearCart, getTotalPrice} =
     useContext(CartContext);
-
   const removeItem = itemToRemove => {
     Alert.alert('삭제 확인', '이 항목을 장바구니에서 삭제하시겠습니까?', [
       {text: '취소', style: 'cancel'},

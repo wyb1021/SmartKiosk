@@ -10,8 +10,25 @@ import { useNavigation } from '@react-navigation/native';
 import { processVoiceCommand } from '../services/openaiService';   // LLM 호출
 import { useMenu } from './MenuContext';                          // ★ 새 컨텍스트
 import { useCart } from '../context/CartContext';
+import { PermissionsAndroid, Platform } from 'react-native';
 
 export const VoiceContext = createContext();
+
+async function requestAudioPermission() {
+  if (Platform.OS === 'android') {
+    const res = await PermissionsAndroid.request(
+      PermissionsAndroid.PERMISSIONS.RECORD_AUDIO,
+      {
+        title: '마이크 권한 요청',
+        message: '음성 인식을 위해 마이크 권한이 필요합니다',
+        buttonPositive: '확인',
+        buttonNegative: '취소',
+      }
+    );
+    return res === PermissionsAndroid.RESULTS.GRANTED;
+  }
+  return true;
+}
 
 export const VoiceProvider = ({ children }) => {
   /* ---------- 상태 ---------- */
@@ -86,10 +103,15 @@ export const VoiceProvider = ({ children }) => {
   /* ---------- 음성 시작/종료 ---------- */
   const startListening = async () => {
     try {
+      const ok = await requestAudioPermission();
+      if (!ok) {
+        Tts.speak('마이크 권한이 거부되었습니다.');
+        return;
+      }
       setIsListening(true);
       await Voice.start('ko-KR');
     } catch (e) {
-      console.error(e);
+      console.error('음성 시작 실패', e);
       setIsListening(false);
     }
   };
