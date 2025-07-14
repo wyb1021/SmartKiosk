@@ -19,30 +19,68 @@ const { width: screenWidth } = Dimensions.get('window');
 
 const MenuDetailScreen = ({ route, navigation }) => {
   /* ① route 파라미터 분리 */
-  const { item: paramItem, id } = route.params ?? {};
-  const [item, setItem] = useState(paramItem);
-  const [loading, setLoading] = useState(!paramItem);
+  const { item: paramItem, fromCart, id, initialOptions, initialQuantity } = route.params ?? {};
+  const [item, setItem] = useState(null);
+  const [loading, setLoading] = useState(true);
 
-  const { addToCart } = useContext(CartContext);
+  const { addToCart, updateItemOptions } = useContext(CartContext);
   const [quantity, setQuantity] = useState(1);
   const [selectedOptions, setSelectedOptions] = useState(null);
-  const icedOnly = item.temperatureOptions?.length === 1 && item.temperatureOptions[0] === 'iced';
 
-  /* ② id만 넘어온 경우 DB 호출 */
+  /* ② 초기 옵션 저장 (fromCart일 때 필요) */
+  const [originalOptions] = useState(initialOptions);
+
+  /* ③ 데이터 로드 */
   useEffect(() => {
-    if (!paramItem && id) {
+    // 1) paramItem 으로 바로 넘어온 경우
+    if (paramItem) {
+      // baseName이 있으면 사용, 없으면 name에서 (iced) 등을 제거
+      const cleanName = paramItem.baseName || paramItem.name.replace(/\s*\((iced|hot)\)\s*/i, '').trim();
+      
+      setItem({
+        ...paramItem,
+        name: cleanName,
+        baseName: cleanName,
+        // images가 없거나 1개만 있는 경우 처리
+        images: paramItem.images || [paramItem.imageUrl, paramItem.imageUrl]
+      });
+      
+      // 장바구니에서 온 경우 initialOptions 사용, 아니면 기본값
+      if (fromCart && initialOptions) {
+        setSelectedOptions(initialOptions);
+        setQuantity(initialQuantity || 1);
+      } else {
+        setSelectedOptions({ size: '중간', temperature: 'iced' });
+        setQuantity(1);
+      }
+      setLoading(false);
+      return;
+    }
+
+    // 2) id 로 fetch 해야 하는 경우
+    if (id) {
       fetchMenuById(id)
         .then(m => {
-          setItem(m);
-          // 기본 옵션을 한국어로 설정
-          setSelectedOptions({ size: '중간', temperature: 'iced' });
+          // fetch한 데이터도 동일하게 처리
+          const cleanName = m.name.replace(/\s*\((iced|hot)\)\s*/i, '').trim();
+          setItem({
+            ...m,
+            name: cleanName,
+            baseName: cleanName
+          });
+          
+          if (fromCart && initialOptions) {
+            setSelectedOptions(initialOptions);
+            setQuantity(initialQuantity || 1);
+          } else {
+            setSelectedOptions({ size: '중간', temperature: 'iced' });
+            setQuantity(1);
+          }
         })
+        .catch(err => console.error(err))
         .finally(() => setLoading(false));
-    } else if (paramItem) {
-      // 기본 옵션을 한국어로 설정
-      setSelectedOptions({ size: '중간', temperature: 'iced' });
     }
-  }, []);
+  }, [paramItem, id, fromCart, initialOptions, initialQuantity]);
 
   if (loading || !item || !selectedOptions) {
     return (
@@ -51,7 +89,19 @@ const MenuDetailScreen = ({ route, navigation }) => {
       </View>
     );
   }
+  const images = (
+    Array.isArray(item.images) && item.images.length
+      ? item.images
+      : [ item.imageUrl ]
+  ).filter((u) => typeof u === 'string' && u.length > 0);
 
+  const hotImage = images.find((u) => u.toLowerCase().includes('hot'));
+  const icedImage = images.find((u) => u.toLowerCase().includes('ice'));
+
+  // safety fallback
+  const finalHotImage = hotImage || images[0] || null;
+  const finalIcedImage = icedImage || images[1] || images[0] || null;
+  
   /* ----- 가격 계산 & 장바구니 추가 ----- */
   const calculateAdjustedPrice = () => {
     let p = item.price;
@@ -68,18 +118,53 @@ const MenuDetailScreen = ({ route, navigation }) => {
     }
 
     const adjusted = calculateAdjustedPrice();
+    
+    if (fromCart) {
+      // 장바구니에서 온 경우 - 기존 옵션 정보 사용
+      updateItemOptions(
+        item._id || item.id,  // id 처리
+        originalOptions,      // 원래 옵션 (중요!)
+        selectedOptions,      // 새로운 옵션
+        quantity,
+        adjusted,
+        item.name,
+        item
+      );
+      navigation.goBack();
+      return;
+    }
+    
+    // 일반적인 장바구니 추가
     addToCart({
-      id: item._id,
-      name: item.name,
+      id: item._id || item.id,
+      name: item.baseName || item.name,  // baseName 우선 사용
+      category: item.category,
       price: adjusted,
       quantity,
       options: selectedOptions,
       totalPrice: adjusted * quantity,
+      images: item.images,  // 이미지 정보도 저장
+      imageUrl: item.imageUrl,
+      menu: item,
     });
     Alert.alert('장바구니', `${item.name}이(가) 장바구니에 추가되었습니다.`);
     navigation.goBack();
   };
+  const deriveImages = (url) => {
+    let hot, iced;
+    if (/ice/i.test(url)) {
+      iced = url;
+      hot = url.replace(/ice(\.\w+)$/i, 'hot$1');
+    } else if (/hot/i.test(url)) {
+      hot = url;
+      iced = url.replace(/hot(\.\w+)$/i, 'ice$1');
+    } else {
+      hot = iced = url;
+    }
+    return [hot, iced];
+  };
 
+  const [hotUrl, icedUrl] = deriveImages(item.imageUrl);
   /* ----- 렌더 ----- */
   return (
     <SafeAreaView style={styles.container}>
@@ -94,16 +179,24 @@ const MenuDetailScreen = ({ route, navigation }) => {
 
       <ScrollView style={styles.scrollContainer} showsVerticalScrollIndicator={false}>
             <View style={styles.imageContainer}>
-              { (item.images?.length ?? 0) > 1 ? (
+              {item.category !== '디저트' ? (
                 <View style={styles.imageRow}>
-                  {item.images.map((uri, idx) => (
-                    <Image
-                      key={idx}
-                      source={{ uri }}
-                      style={styles.imageMulti}
-                      resizeMode="contain"
-                    />
-                  ))}
+                  <Image
+                    source={{ uri: hotUrl }}
+                    style={[
+                      styles.imageMulti,
+                      selectedOptions.temperature !== 'hot' && styles.imageInactive,
+                    ]}
+                    resizeMode="contain"
+                  />
+                  <Image
+                    source={{ uri: icedUrl }}
+                    style={[
+                      styles.imageMulti,
+                      selectedOptions.temperature !== 'iced' && styles.imageInactive,
+                    ]}
+                    resizeMode="contain"
+                  />
                 </View>
               ) : (
                 <Image
@@ -112,75 +205,77 @@ const MenuDetailScreen = ({ route, navigation }) => {
                   resizeMode="contain"
                 />
               )}
-            </View>
+      </View>
 
         <View style={styles.content}>
           {/* 메뉴 정보 */}
           <View style={styles.menuInfo}>
-            <Text style={styles.name}>
-              {item.name}
-              {icedOnly && ' (ICE)'}
-            </Text>
+            <Text style={styles.name}>{item.baseName || item.name}</Text>
             <Text style={styles.category}>{item.category}</Text>
             <Text style={styles.price}>{calculateAdjustedPrice().toLocaleString()}원</Text>
-            {item.description && (
-              <Text style={styles.description}>{item.description}</Text>
-            )}
           </View>
 
-          {/* 사이즈 옵션 */}
-          <View style={styles.optionSection}>
-            <Text style={styles.optionTitle}>사이즈</Text>
-            <View style={styles.optionButtons}>
-              {['작은', '중간', '큰'].map(size => (
-                <TouchableOpacity
-                  key={size}
-                  style={[
-                    styles.optionButton,
-                    selectedOptions.size === size && styles.selectedOption,
-                  ]}
-                  onPress={() =>
-                    setSelectedOptions(prev => ({ ...prev, size }))
-                  }>
-                  <Text
+          {/* ─── 사이즈 옵션 (디저트면 숨김) ─── */}
+          {item.category !== '디저트' && (
+            <View style={styles.optionSection}>
+              <Text style={styles.optionTitle}>사이즈</Text>
+              <View style={styles.optionButtons}>
+                {['작은', '중간', '큰'].map(size => (
+                  <TouchableOpacity
+                    key={size}
                     style={[
-                      styles.optionText,
-                      selectedOptions.size === size && styles.selectedText,
-                    ]}>
-                    {size}
-                    {size === '작은' && ' (-500원)'}
-                    {size === '큰' && ' (+500원)'}
-                  </Text>
-                </TouchableOpacity>
-              ))}
+                      styles.optionButton,
+                      selectedOptions.size === size && styles.selectedOption,
+                    ]}
+                    onPress={() =>
+                      setSelectedOptions(prev => ({ ...prev, size }))
+                    }
+                  >
+                    <Text
+                      style={[
+                        styles.optionText,
+                        selectedOptions.size === size && styles.selectedText,
+                      ]}
+                    >
+                      {size}
+                      {size === '작은' && ' (-500원)'}
+                      {size === '큰' && ' (+500원)'}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
             </View>
-          </View>
+          )}
 
-          {/* 온도 옵션 */}
-          <View style={styles.optionSection}>
-            <Text style={styles.optionTitle}>온도</Text>
-            <View style={styles.optionButtons}>
-              {(icedOnly ? ['iced'] : ['hot', 'iced']).map(temp => (
-                <TouchableOpacity
-                  key={temp}
-                  style={[
-                    styles.optionButton,
-                    selectedOptions.temperature === temp && styles.selectedOption,
-                  ]}
-                  onPress={() =>
-                    setSelectedOptions(prev => ({ ...prev, temperature: temp }))
-                  }>
-                  <Text
+          {/* ─── 온도 옵션 (디저트면 숨김) ─── */}
+          {item.category !== '디저트' && (
+            <View style={styles.optionSection}>
+              <Text style={styles.optionTitle}>온도</Text>
+              <View style={styles.optionButtons}>
+                {['hot', 'iced'].map(temp => (
+                  <TouchableOpacity
+                    key={temp}
                     style={[
-                      styles.optionText,
-                      selectedOptions.temperature === temp && styles.selectedText,
-                    ]}>
-                    {temp === 'hot' ? '뜨거운' : '차가운'}
-                  </Text>
-                </TouchableOpacity>
-              ))}
+                      styles.optionButton,
+                      selectedOptions.temperature === temp && styles.selectedOption,
+                    ]}
+                    onPress={() =>
+                      setSelectedOptions(prev => ({ ...prev, temperature: temp }))
+                    }
+                  >
+                    <Text
+                      style={[
+                        styles.optionText,
+                        selectedOptions.temperature === temp && styles.selectedText,
+                      ]}
+                    >
+                      {temp === 'hot' ? '뜨거운' : '차가운'}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
             </View>
-          </View>
+          )}
 
           {/* 수량 */}
           <View style={styles.quantitySection}>
@@ -217,7 +312,7 @@ const MenuDetailScreen = ({ route, navigation }) => {
           onPress={handleAddToCart}
           disabled={quantity === 0}>
           <Text style={styles.addButtonText}>
-            {quantity === 0 ? '수량을 선택해주세요' : '장바구니에 담기'}
+            {fromCart ? '변경사항 저장' : (quantity === 0 ? '수량을 선택해주세요' : '장바구니에 담기')}
           </Text>
         </TouchableOpacity>
       </View>
@@ -290,6 +385,9 @@ const styles = StyleSheet.create({
     width: '48%',
     height: '100%',
     borderRadius: 8,
+  },
+  imageInactive: {           // ← 선택되지 않은 이미지 스타일
+    opacity: 0.3,
   },
 
   /* 컨텐츠 */

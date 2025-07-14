@@ -7,11 +7,12 @@ export const CartProvider = ({ children }) => {
 
   /* ---------- 상품 추가 ---------- */
   const addToCart = (item) => {
+    const entry = { ...item, menu: item.menu || { ...item } };
     setCartItems((prev) => {
       const idx = prev.findIndex(
         (c) =>
-          c.id === item.id &&                // id는 Mongo _id (문자열)
-          JSON.stringify(c.options) === JSON.stringify(item.options)
+          c.id === entry.id &&                // id는 Mongo _id (문자열)
+          JSON.stringify(c.options) === JSON.stringify(entry.options)
       );
 
       if (idx > -1) {
@@ -19,13 +20,13 @@ export const CartProvider = ({ children }) => {
         const updated = [...prev];
         updated[idx] = {
           ...updated[idx],
-          quantity: updated[idx].quantity + item.quantity,
-          totalPrice: updated[idx].totalPrice + item.totalPrice,
+          quantity: updated[idx].quantity + entry.quantity,
+          totalPrice: updated[idx].totalPrice + entry.totalPrice,
         };
         return updated;
       }
       /* 새 아이템 */
-      return [...prev, item];
+      return [...prev, entry];
     });
   };
 
@@ -51,6 +52,21 @@ export const CartProvider = ({ children }) => {
       )
     );
 
+  const updateItemOptions = (id, oldOptions, newOptions, quantity, price, name, menuObject) => {
+    // 1) 기존 항목 제거
+    removeFromCart(id, oldOptions);
+    // 2) 새로운 옵션·수량으로 담기
+    addToCart({
+      id,
+      name,
+      menu: menuObject,
+      price,       // 변경된 price(옵션 적용 후) 계산해서 넣어주세요
+      options: newOptions,
+      quantity,
+      totalPrice: price * quantity,
+    });
+  };
+
   /* ---------- 기타 ---------- */
   const clearCart = () => setCartItems([]);
   const getTotalPrice = () =>
@@ -63,6 +79,7 @@ export const CartProvider = ({ children }) => {
         addToCart,
         removeFromCart,
         updateQuantity,
+        updateItemOptions,
         clearCart,
         getTotalPrice,
       }}>

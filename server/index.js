@@ -9,6 +9,7 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
+app.use('/menus', menuRoutes);
 app.use('/images', express.static('public/images'));
 app.use('/api/menu', menuRoutes);
 

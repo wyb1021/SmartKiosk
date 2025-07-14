@@ -21,7 +21,6 @@ export default function MenuListScreen() {
   const nav = useNavigation();
   const { menus } = useMenu();
   const { isListening, startListening, stopListening } = useVoice();
-
   /* ───────── 1) Hot / Iced 항목 병합 ───────── */
   const mergedMenus = useMemo(() => {
     const dict = {};
@@ -29,29 +28,41 @@ export default function MenuListScreen() {
     menus.forEach(m => {
       // "아메리카노 (Hot)" → "아메리카노"
       const base = m.name.replace(/\s*\((Hot|Iced)\)$/i, '');
-
+      const temps = m.temperatureOptions ?? [];
       if (!dict[base]) {
         dict[base] = {
           ...m,
           name: base, // 기준 이름으로 교체
           images: [m.imageUrl],
-          temperatureOptions: [...m.temperatureOptions],
+          temperatureOptions: [...temps],
         };
       } else {
         dict[base].images.push(m.imageUrl);
         dict[base].temperatureOptions = Array.from(
-          new Set([...dict[base].temperatureOptions, ...m.temperatureOptions]),
+          new Set([...dict[base].temperatureOptions, ...temps]),
         );
       }
     });
 
     return Object.values(dict);
   }, [menus]);
+  const sorted = useMemo(() => {
+    const rank = m => (m.adminPriority ?? Infinity);      // null ⇒ 맨 뒤
+    return [...mergedMenus].sort((a, b) => {
+      const r = rank(a) - rank(b);                        // ① adminPriority
+      if (r !== 0) return r;
+      if (a.popularity !== b.popularity)                 // ② popularity (높을수록 위)
+        return b.popularity - a.popularity;
+      return a.name.localeCompare(b.name, 'ko');
+    });
+  }, [mergedMenus]);
 
   /* ───────── 카테고리 상태 ───────── */
-  const [cat, setCat] = useState('All');
+  const [cat, setCat] = useState('전체');
+  const CAT_ORDER = ['전체', '커피', '티', '라떼', '에이드', '스무디', '디저트'];
   const cats = useMemo(
-    () => ['All', ...new Set(mergedMenus.map(m => m.category))],
+    () =>
+      CAT_ORDER.filter(k => k === '전체' || mergedMenus.some(m => m.category === k)),
     [mergedMenus],
   );
   const catRef = useRef(null);
@@ -60,9 +71,10 @@ export default function MenuListScreen() {
     catRef.current?.scrollToIndex({ index: i, viewPosition: 0.5 });
   };
 
-  /* ───────── 필터링된 메뉴를 2개씩 묶어서 행으로 ───────── */
   const filteredMenus =
-    cat === 'All' ? mergedMenus : mergedMenus.filter(m => m.category === cat);
+    cat === '전체'
+      ? sorted
+      : sorted.filter(m => m.category === cat);
 
   const data = useMemo(() => {
     const rows = [];

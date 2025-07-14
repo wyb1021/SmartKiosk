@@ -81,10 +81,12 @@ const CartScreen = ({navigation}) => {
     <View style={styles.cartItem}>
       <View style={styles.itemInfo}>
         <Text style={styles.itemName}>{item.name}</Text>
-        <Text style={styles.itemOptions}>
-          {item.options.size && `사이즈: ${item.options.size}`}
-          {item.options.temperature && `, ${item.options.temperature}`}
-        </Text>
+        {item.category !== '디저트' && (
+          <Text style={styles.itemOptions}>
+            {item.options.size && `사이즈: ${item.options.size}`}
+            {item.options.temperature && `, ${item.options.temperature === 'hot' ? '뜨거운' : '차가운'}`}
+          </Text>
+        )}
         <View style={styles.quantityControls}>
           <TouchableOpacity
             style={styles.quantityButton}
@@ -98,6 +100,26 @@ const CartScreen = ({navigation}) => {
             <Text style={styles.quantityButtonText}>+</Text>
           </TouchableOpacity>
         </View>
+        <TouchableOpacity
+          onPress={() => {
+            // 메뉴명에서 (iced) 또는 (hot) 제거하여 기본 이름 추출
+            const baseName = item.name.replace(/\s*\((iced|hot)\)\s*/i, '').trim();
+            
+            navigation.navigate('MenuDetail', {
+              fromCart: true,
+              initialOptions: item.options,
+              initialQuantity: item.quantity,
+              item: {
+                 ...item.menu,        
+                 options: item.options,
+                 quantity: item.quantity,
+              }
+            })
+          }}
+          style={styles.changeButton}
+        >
+         <Text style={styles.changeButtonText}>옵션 변경</Text>
+       </TouchableOpacity>
       </View>
       <View style={styles.itemPriceSection}>
         <Text style={styles.itemPrice}>
@@ -109,7 +131,7 @@ const CartScreen = ({navigation}) => {
           <Text style={styles.removeButtonText}>삭제</Text>
         </TouchableOpacity>
       </View>
-    </View>
+  </View>
   );
 
   return (
@@ -276,6 +298,16 @@ const styles = StyleSheet.create({
   quantityButtonText: {
     fontSize: 15,
     color: 'black',
+  },
+  changeButton: {
+    marginTop: 8,
+    paddingVertical: 4,
+    alignSelf: 'flex-start',
+  },
+  changeButtonText: {
+    fontSize: 14,
+    color: '#007AFF',
+    fontWeight: 'bold',
   },
 });
 
