@@ -18,7 +18,7 @@ export default function AppNavigator() {
       <Stack.Screen 
         name="MenuList" 
         component={MenuListScreen} 
-        options={{ title: '메뉴' }} 
+        options={{ headerShown: false }}
       />
       <Stack.Screen 
         name="MenuDetail" 

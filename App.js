@@ -7,7 +7,6 @@ import { CartProvider } from './src/context/CartContext';
 import { VoiceProvider } from './src/contexts/VoiceContext';
 
 import AppNavigator from './src/navigation/AppNavigator';
-import GlobalVoiceButton from './src/components/GlobalVoiceButton';
 
 export default function App() {
   return (
@@ -17,7 +16,6 @@ export default function App() {
           <NavigationContainer>
             <VoiceProvider>
               <AppNavigator />
-              <GlobalVoiceButton />
             </VoiceProvider>
           </NavigationContainer>
         </CartProvider>

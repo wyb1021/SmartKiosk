@@ -25,6 +25,34 @@ const CartScreen = ({navigation}) => {
     ]);
   };
 
+  const handleQuantityChange = (item, newQuantity) => {
+    if (newQuantity === 0) {
+      // 수량이 0이 되면 삭제 확인
+      Alert.alert(
+        '항목 삭제',
+        '수량이 0이 되면 장바구니에서 삭제됩니다. \n삭제하시겠습니까?',
+        [
+          {
+            text: '취소',
+            style: 'cancel',
+            onPress: () => {
+              // 취소하면 수량을 1로 유지
+              updateQuantity(item.id, item.options, 1);
+            },
+          },
+          {
+            text: '삭제',
+            onPress: () => {
+              removeFromCart(item.id, item.options);
+            },
+          },
+        ],
+      );
+    } else {
+      updateQuantity(item.id, item.options, newQuantity);
+    }
+  };
+
   const handleCheckout = () => {
     if (cartItems.length === 0) {
       Alert.alert('알림', '장바구니가 비어있습니다.');
@@ -49,7 +77,6 @@ const CartScreen = ({navigation}) => {
     );
   };
 
-  // ★ 변경된 부분: renderCartItem 함수를 CartScreen 컴포넌트 내부로 이동
   const renderCartItem = ({item}) => (
     <View style={styles.cartItem}>
       <View style={styles.itemInfo}>
@@ -61,21 +88,13 @@ const CartScreen = ({navigation}) => {
         <View style={styles.quantityControls}>
           <TouchableOpacity
             style={styles.quantityButton}
-            onPress={() =>
-              updateQuantity(
-                item.id,
-                item.options,
-                Math.max(1, item.quantity - 1),
-              )
-            }>
+            onPress={() => handleQuantityChange(item, item.quantity - 1)}>
             <Text style={styles.quantityButtonText}>-</Text>
           </TouchableOpacity>
           <Text style={styles.itemQuantity}>{item.quantity}개</Text>
           <TouchableOpacity
             style={styles.quantityButton}
-            onPress={() =>
-              updateQuantity(item.id, item.options, item.quantity + 1)
-            }>
+            onPress={() => handleQuantityChange(item, item.quantity + 1)}>
             <Text style={styles.quantityButtonText}>+</Text>
           </TouchableOpacity>
         </View>
@@ -93,13 +112,8 @@ const CartScreen = ({navigation}) => {
     </View>
   );
 
-  // ★ 원래의 CartScreen 컴포넌트의 return 문
   return (
     <View style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.title}>장바구니</Text>
-      </View>
-
       {cartItems.length === 0 ? (
         <View style={styles.emptyContainer}>
           <Text style={styles.emptyText}>장바구니가 비어있습니다</Text>
@@ -142,17 +156,9 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#f5f5f5',
   },
-  header: {
-    padding: 20,
-    backgroundColor: 'white',
-    elevation: 2,
-  },
-  title: {
-    fontSize: 28,
-    fontWeight: 'bold',
-  },
   cartList: {
     padding: 15,
+    paddingTop: 10, // 상단 여백 추가
   },
   cartItem: {
     backgroundColor: 'white',

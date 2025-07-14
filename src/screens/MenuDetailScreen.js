@@ -8,19 +8,25 @@ import {
   ScrollView,
   ActivityIndicator,
   Alert,
+  SafeAreaView,
+  Dimensions,
 } from 'react-native';
+import Icon from 'react-native-vector-icons/MaterialIcons';
 import { CartContext } from '../context/CartContext';
-import { fetchMenuById } from '../api/menuApi';        // ★ DB 개별 조회
+import { fetchMenuById } from '../api/menuApi';
+
+const { width: screenWidth } = Dimensions.get('window');
 
 const MenuDetailScreen = ({ route, navigation }) => {
   /* ① route 파라미터 분리 */
   const { item: paramItem, id } = route.params ?? {};
-  const [item, setItem] = useState(paramItem);        // 파라미터가 있으면 바로 사용
-  const [loading, setLoading] = useState(!paramItem); // 없으면 로딩 시작
+  const [item, setItem] = useState(paramItem);
+  const [loading, setLoading] = useState(!paramItem);
 
   const { addToCart } = useContext(CartContext);
   const [quantity, setQuantity] = useState(1);
   const [selectedOptions, setSelectedOptions] = useState(null);
+  const icedOnly = item.temperatureOptions?.length === 1 && item.temperatureOptions[0] === 'iced';
 
   /* ② id만 넘어온 경우 DB 호출 */
   useEffect(() => {
@@ -28,43 +34,42 @@ const MenuDetailScreen = ({ route, navigation }) => {
       fetchMenuById(id)
         .then(m => {
           setItem(m);
-          // 옵션 초기화
-          const initialSize =
-            m.sizeOptions?.includes('medium') ? 'medium' : m.sizeOptions?.[0];
-          const initialTemp = m.temperatureOptions?.[0];
-          setSelectedOptions({ size: initialSize, temperature: initialTemp });
+          // 기본 옵션을 한국어로 설정
+          setSelectedOptions({ size: '중간', temperature: 'iced' });
         })
         .finally(() => setLoading(false));
     } else if (paramItem) {
-      const initialSize =
-        paramItem.sizeOptions?.includes('medium')
-          ? 'medium'
-          : paramItem.sizeOptions?.[0];
-      const initialTemp = paramItem.temperatureOptions?.[0];
-      setSelectedOptions({ size: initialSize, temperature: initialTemp });
+      // 기본 옵션을 한국어로 설정
+      setSelectedOptions({ size: '중간', temperature: 'iced' });
     }
   }, []);
 
   if (loading || !item || !selectedOptions) {
     return (
-      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+      <View style={styles.loadingContainer}>
         <ActivityIndicator size="large" color="#007AFF" />
       </View>
-    );                                // ✅ 또는 return null;
+    );
   }
 
   /* ----- 가격 계산 & 장바구니 추가 ----- */
   const calculateAdjustedPrice = () => {
     let p = item.price;
-    if (selectedOptions.size === 'small') p -= 500;
-    else if (selectedOptions.size === 'large') p += 500;
+    if (selectedOptions.size === '작은') p -= 500;
+    else if (selectedOptions.size === '큰') p += 500;
     return p;
   };
 
   const handleAddToCart = () => {
+    // 수량이 0인 경우 처리
+    if (quantity === 0) {
+      Alert.alert('알림', '수량을 1개 이상 선택해주세요.');
+      return;
+    }
+
     const adjusted = calculateAdjustedPrice();
     addToCart({
-      id: item._id,                      // ★ Mongo _id
+      id: item._id,
       name: item.name,
       price: adjusted,
       quantity,
@@ -72,24 +77,62 @@ const MenuDetailScreen = ({ route, navigation }) => {
       totalPrice: adjusted * quantity,
     });
     Alert.alert('장바구니', `${item.name}이(가) 장바구니에 추가되었습니다.`);
-    navigation.navigate('MenuList');
+    navigation.goBack();
   };
 
   /* ----- 렌더 ----- */
-  return(
-    <ScrollView style={styles.container}>
-      <Image source={{ uri: item.imageUrl }} style={styles.image} />
+  return (
+    <SafeAreaView style={styles.container}>
+      {/* 헤더 */}
+      <View style={styles.header}>
+        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
+          <Icon name="arrow-back" size={24} color="#000" />
+        </TouchableOpacity>
+        <Text style={styles.headerTitle}>메뉴 상세</Text>
+        <View style={styles.headerRight} />
+      </View>
 
-      <View style={styles.content}>
-        <Text style={styles.name}>{item.name}</Text>
-        <Text style={styles.price}>{calculateAdjustedPrice().toLocaleString()}원</Text>
+      <ScrollView style={styles.scrollContainer} showsVerticalScrollIndicator={false}>
+            <View style={styles.imageContainer}>
+              { (item.images?.length ?? 0) > 1 ? (
+                <View style={styles.imageRow}>
+                  {item.images.map((uri, idx) => (
+                    <Image
+                      key={idx}
+                      source={{ uri }}
+                      style={styles.imageMulti}
+                      resizeMode="contain"
+                    />
+                  ))}
+                </View>
+              ) : (
+                <Image
+                  source={{ uri: item.imageUrl }}
+                  style={styles.image}
+                  resizeMode="contain"
+                />
+              )}
+            </View>
 
-        {/* 사이즈 옵션 */}
-        {item.sizeOptions?.length > 0 && (
+        <View style={styles.content}>
+          {/* 메뉴 정보 */}
+          <View style={styles.menuInfo}>
+            <Text style={styles.name}>
+              {item.name}
+              {icedOnly && ' (ICE)'}
+            </Text>
+            <Text style={styles.category}>{item.category}</Text>
+            <Text style={styles.price}>{calculateAdjustedPrice().toLocaleString()}원</Text>
+            {item.description && (
+              <Text style={styles.description}>{item.description}</Text>
+            )}
+          </View>
+
+          {/* 사이즈 옵션 */}
           <View style={styles.optionSection}>
             <Text style={styles.optionTitle}>사이즈</Text>
             <View style={styles.optionButtons}>
-              {item.sizeOptions.map(size => (
+              {['작은', '중간', '큰'].map(size => (
                 <TouchableOpacity
                   key={size}
                   style={[
@@ -105,19 +148,19 @@ const MenuDetailScreen = ({ route, navigation }) => {
                       selectedOptions.size === size && styles.selectedText,
                     ]}>
                     {size}
+                    {size === '작은' && ' (-500원)'}
+                    {size === '큰' && ' (+500원)'}
                   </Text>
                 </TouchableOpacity>
               ))}
             </View>
           </View>
-        )}
 
-        {/* 온도 옵션 */}
-        {item.temperatureOptions?.length > 0 && (
+          {/* 온도 옵션 */}
           <View style={styles.optionSection}>
             <Text style={styles.optionTitle}>온도</Text>
             <View style={styles.optionButtons}>
-              {item.temperatureOptions.map(temp => (
+              {(icedOnly ? ['iced'] : ['hot', 'iced']).map(temp => (
                 <TouchableOpacity
                   key={temp}
                   style={[
@@ -132,52 +175,284 @@ const MenuDetailScreen = ({ route, navigation }) => {
                       styles.optionText,
                       selectedOptions.temperature === temp && styles.selectedText,
                     ]}>
-                    {temp}
+                    {temp === 'hot' ? '뜨거운' : '차가운'}
                   </Text>
                 </TouchableOpacity>
               ))}
             </View>
           </View>
-        )}
 
-        {/* 수량 */}
-        <View style={styles.quantitySection}>
-          <Text style={styles.optionTitle}>수량</Text>
-          <View style={styles.quantityControls}>
-            <TouchableOpacity
-              style={styles.quantityButton}
-              onPress={() => setQuantity(Math.max(1, quantity - 1))}>
-              <Text style={styles.quantityButtonText}>-</Text>
-            </TouchableOpacity>
-            <Text style={styles.quantity}>{quantity}</Text>
-            <TouchableOpacity
-              style={styles.quantityButton}
-              onPress={() => setQuantity(quantity + 1)}>
-              <Text style={styles.quantityButtonText}>+</Text>
-            </TouchableOpacity>
+          {/* 수량 */}
+          <View style={styles.quantitySection}>
+            <Text style={styles.optionTitle}>수량</Text>
+            <View style={styles.quantityControls}>
+              <TouchableOpacity
+                style={[styles.quantityButton, quantity === 0 && styles.quantityButtonDisabled]}
+                onPress={() => setQuantity(Math.max(0, quantity - 1))}>
+                <Text style={[styles.quantityButtonText, quantity === 0 && styles.quantityButtonTextDisabled]}>-</Text>
+              </TouchableOpacity>
+              <Text style={[styles.quantity, quantity === 0 && styles.quantityZero]}>{quantity}</Text>
+              <TouchableOpacity
+                style={styles.quantityButton}
+                onPress={() => setQuantity(quantity + 1)}>
+                <Text style={styles.quantityButtonText}>+</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+
+          {/* 합계 */}
+          <View style={styles.totalSection}>
+            <Text style={styles.totalLabel}>합계</Text>
+            <Text style={[styles.totalPrice, quantity === 0 && styles.totalPriceZero]}>
+              {(calculateAdjustedPrice() * quantity).toLocaleString()}원
+            </Text>
           </View>
         </View>
+      </ScrollView>
 
-        {/* 합계 */}
-        <View style={styles.totalSection}>
-          <Text style={styles.totalLabel}>합계</Text>
-          <Text style={styles.totalPrice}>
-            {(calculateAdjustedPrice() * quantity).toLocaleString()}원
+      {/* 하단 고정 버튼 */}
+      <View style={styles.bottomContainer}>
+        <TouchableOpacity 
+          style={[styles.addButton, quantity === 0 && styles.addButtonDisabled]} 
+          onPress={handleAddToCart}
+          disabled={quantity === 0}>
+          <Text style={styles.addButtonText}>
+            {quantity === 0 ? '수량을 선택해주세요' : '장바구니에 담기'}
           </Text>
-        </View>
-
-        <TouchableOpacity style={styles.addButton} onPress={handleAddToCart}>
-          <Text style={styles.addButtonText}>장바구니에 담기</Text>
         </TouchableOpacity>
       </View>
-    </ScrollView>
+    </SafeAreaView>
   );
 };
 
-/* ---- 기존 스타일 그대로 ---- */
 const styles = StyleSheet.create({
-  /* ... (생략, 이전 코드와 동일) ... */
+  container: {
+    flex: 1,
+    backgroundColor: '#fff',
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#fff',
+  },
+  
+  /* 헤더 */
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    height: 56,
+    paddingHorizontal: 16,
+    backgroundColor: '#fff',
+    borderBottomWidth: 1,
+    borderBottomColor: '#e0e0e0',
+  },
+  backButton: {
+    padding: 8,
+    marginLeft: -8,
+  },
+  headerTitle: {
+    flex: 1,
+    textAlign: 'center',
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#000',
+  },
+  headerRight: {
+    width: 40,
+  },
+
+  /* 스크롤 영역 */
+  scrollContainer: {
+    flex: 1,
+  },
+  
+  /* 이미지 컨테이너 & 이미지 */
+  imageContainer: {
+    width: screenWidth,
+    height: screenWidth * 0.8, // 화면 너비의 80% 높이
+    backgroundColor: '#f5f5f5',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  image: {
+    width: '100%',
+    height: '100%',
+  },
+  imageRow: {                // ← 두 장 이상일 때 컨테이너
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    width: '100%',
+    height: '100%',
+    paddingHorizontal: 8,
+  },
+  imageMulti: {              // ← 두 장 각각의 크기
+    width: '48%',
+    height: '100%',
+    borderRadius: 8,
+  },
+
+  /* 컨텐츠 */
+  content: {
+    padding: 20,
+  },
+
+  /* 메뉴 정보 */
+  menuInfo: {
+    marginBottom: 30,
+  },
+  name: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: '#000',
+    marginBottom: 8,
+  },
+  category: {
+    fontSize: 14,
+    color: '#666',
+    marginBottom: 12,
+  },
+  price: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#007AFF',
+    marginBottom: 12,
+  },
+  description: {
+    fontSize: 16,
+    color: '#333',
+    lineHeight: 24,
+  },
+
+  /* 옵션 섹션 */
+  optionSection: {
+    marginBottom: 24,
+  },
+  optionTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#000',
+    marginBottom: 12,
+  },
+  optionButtons: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  optionButton: {
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderRadius: 25,
+    borderWidth: 1,
+    borderColor: '#ddd',
+    backgroundColor: '#fff',
+    marginRight: 8,
+    marginBottom: 8,
+    alignItems: 'center',
+    minWidth: 100,
+  },
+  selectedOption: {
+    backgroundColor: '#007AFF',
+    borderColor: '#007AFF',
+  },
+  optionText: {
+    fontSize: 14,
+    color: '#333',
+    fontWeight: '500',
+  },
+  selectedText: {
+    color: '#fff',
+    fontWeight: 'bold',
+  },
+
+  /* 수량 */
+  quantitySection: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 24,
+  },
+  quantityControls: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  quantityButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#f0f0f0',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  quantityButtonDisabled: {
+    backgroundColor: '#f8f8f8',
+  },
+  quantityButtonText: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#333',
+  },
+  quantityButtonTextDisabled: {
+    color: '#ccc',
+  },
+  quantity: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#000',
+    marginHorizontal: 20,
+    minWidth: 30,
+    textAlign: 'center',
+  },
+  quantityZero: {
+    color: '#999',
+  },
+
+  /* 합계 */
+  totalSection: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 16,
+    borderTopWidth: 1,
+    borderTopColor: '#e0e0e0',
+    marginBottom: 20,
+  },
+  totalLabel: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#000',
+  },
+  totalPrice: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#007AFF',
+  },
+  totalPriceZero: {
+    color: '#999',
+  },
+
+  /* 하단 버튼 */
+  bottomContainer: {
+    padding: 20,
+    backgroundColor: '#fff',
+    borderTopWidth: 1,
+    borderTopColor: '#e0e0e0',
+  },
+  addButton: {
+    backgroundColor: '#007AFF',
+    borderRadius: 12,
+    paddingVertical: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  addButtonDisabled: {
+    backgroundColor: '#ddd',
+  },
+  addButtonText: {
+    color: '#fff',
+    fontSize: 18,
+    fontWeight: 'bold',
+  },
 });
 
 export default MenuDetailScreen;
-
